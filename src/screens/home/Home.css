@@ -1,0 +1,24 @@
+.header-home {
+  background-color: #ff9999;
+  padding: 8px;
+  text-align: center;
+  font-size: 1rem;
+}
+.flex-container {
+  display: flex;
+  flex-direction: row;
+  margin: 16px;
+}
+
+.left {
+  width: 76%;
+}
+.right {
+  width: 24%;
+}
+.movie-item {
+  margin: 16px;
+}
+.movie-item:hover {
+  cursor: pointer;
+}
