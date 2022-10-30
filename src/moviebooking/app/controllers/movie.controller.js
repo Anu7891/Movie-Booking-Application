@@ -55,15 +55,24 @@ const findOne = async (req, res) => {
 };
 
 
-const findShows = async (req, res) => {
-    const movieid = req.params.id;
-    const movie = await Movie.findOne({ movieid });
-    if (movie) {
-        res.status(200).json({ success: true, shows: movie.shows });
-    }
-    else {
-        res.status(404).json({ success: false, msg: "Id Doesn't match any Movie" })
-    }
+
+const findShows = (req, res) => {
+
+    const id = req.params.id;
+
+    Movie.find({ movieid: id })
+        .then(data => {
+            if (!data)
+                res.status(404).send({ message: "Not found Movie with id " + id });
+            else {
+                res.send(data[0].shows);//since we are getting an array after search
+            }
+        })
+        .catch(err => {
+            res
+                .status(500)
+                .send({ message: "Error retrieving Shows for movie with id=" + id });
+        });
 }
 
 module.exports = { findAllMovies, findOne, findShows }
