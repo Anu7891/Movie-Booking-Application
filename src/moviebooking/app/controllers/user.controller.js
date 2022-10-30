@@ -3,74 +3,88 @@ const TokenGenerator = require('uuid-token-generator');
 const { fromString } = require('uuidv4');
 const { atob, btoa } = require("b2a");
 
-//Login 
 const login = (req, res) => {
-    //Since the authorization header has a value in the format of Bearer [JWT_TOKEN], we have split the value by the space and separated the token.
+    console.log(req.headers.authorization);
     const authHeader = req.headers.authorization.split(" ")[1];
+    console.log(authHeader);
+    console.log(atob(authHeader));
     let unamePwd = atob(authHeader);
     const uname = unamePwd.split(":")[0];
     const pwd = unamePwd.split(":")[1];
 
-    //Validate Request 
+    console.log(uname);
+    console.log(pwd);
+    // Validate request
     if (!uname && !pwd) {
-        res.status(400).send({ message: "Please provide username and password to continue" })
+        res.status(400).send({ message: "Please provide username and password to continue." });
         return;
     }
 
     const filter = { username: uname };
 
+    //below method on successful comparison returns an array!
     User.find(filter, (err, usersFound) => {
-        let user = usersFound[0]; //get the first element from single size array 
+        let user = usersFound[0];  //get the first element from single size array
         if (err || user === null) {
+            console.log("IN ERR");
             res.status(500).send({
-                message: "User Not Found"
-            })
-        }
-        else {
+                message: "User Not Found."
+            });
+        } else {
 
             if (pwd === user.password) {
-                const tokgen = new TokenGenerator(); // Default is a 128-bit token encoded in base58 
+                const tokgen = new TokenGenerator(); // Default is a 128-bit token encoded in base58
                 const accessTokenGenerated = tokgen.generate();
+                console.log(accessTokenGenerated);
+
                 const uuidGenerated = fromString(uname);
                 user.isLoggedIn = true;
                 user.uuid = uuidGenerated;
                 user.accesstoken = accessTokenGenerated;
                 User.findOneAndUpdate(filter, user, { useFindAndModify: false })
-                    .then((data) => {
+                    .then(data => {
                         if (!data) {
                             res.status(404).send({
-                                message: "Some error occurred, please try again later"
-                            })
+                                message: "Some error occurred, please try again later."
+                            });
                         } else {
                             //we are collecting this in react side as xhrLogin.getResponseHeader("access-token")
-                            res.header('access-token', user.accesstoken)
+                            res.header('access-token', user.accesstoken);
+
                             //we are collecting this in react side as JSON.parse(this.responseText).id  
                             res.send({ "id": user.uuid, "access-token": user.accesstoken });
+                            //res.send(user);
                         }
                     })
                     .catch(err => {
-                        res.status(500).send({ message: "Error updating" })
+                        res.status(500).send({
+                            message: "Error updating."
+                        });
                     });
+
             } else {
                 res.status(500).send({
-                    message: "Please enter valid password"
+                    message: "Please enter valid password."
                 });
             }
         }
+
     });
 
-}
+};
 
-//SignUp Api
 const signUp = (req, res) => {
 
+    console.log(req.body);
+    // Validate request
     if (!req.body.email_address && !req.body.password) {
         res.status(400).send({ message: "Please provide email and password to continue." });
         return;
     }
 
-    //Create a User 
-
+    // Create a User
+    // Since userName is not asked in react code
+    // we are considering concating firstname & lastname as username
     const user = new User({
         email: req.body.email_address,
         first_name: req.body.first_name,
@@ -86,17 +100,24 @@ const signUp = (req, res) => {
         bookingRequests: []
     });
 
-    //Save the user in database 
-    user.save(user).then(data => {
-        res.send(data);
-    })
+    // Save User in the database
+    user
+        .save(user)
+        .then(data => {
+            res.send(data);
+        })
         .catch(err => {
-            res.status(500).send({ message: err.message || "Some error occurred, please try again later" });
+            res.status(500).send({
+                message:
+                    err.message || "Some error occurred, please try again later."
+            });
         });
 };
 
 
 const logout = (req, res) => {
+
+    // Validate request
     if (!req.body.uuid) {
         res.status(400).send({ message: "ID Not Found!" });
         return;
@@ -117,8 +138,118 @@ const logout = (req, res) => {
                 message: "Error updating."
             });
         });
+};
 
-}
+const getCouponCode = (req, res) => {
+    console.log("In coupen code");
+    console.log(req.headers.authorization);
+    const tokenReceived = req.headers.authorization.split(" ")[1];
+    console.log(tokenReceived);
+    User.find({ "accesstoken": tokenReceived })
+        .then(data => {
+            if (!data) {
+                res.status(404).send({
+                    message: "Some error occurred, please try again later."
+                });
+            } else {
+                console.log(data);
+                console.log(data[0].coupens);
 
-module.exports = { login, signUp, logout };
+                var sendCoupenData = null;
+                for (let i = 0; i < data[0].coupens.length; i++) {
+                    // console.log(data[0].coupens[i].id);
+                    // console.log(data[0].coupens[i].discountValue);
 
+                    if (data[0].coupens[i].id == req.query.code) {
+                        sendCoupenData = data[0].coupens[i]; //data[0].coupens[i].discountValue;
+                        break;
+                    }
+                }
+
+                res.send(sendCoupenData);
+            }
+        })
+        .catch(err => {
+            res.status(500).send({
+                message: "Error validating token!."
+            });
+        });
+
+
+};
+
+const bookShow = (req, res) => {
+
+    var update = null;
+    var newRefNo = null;
+
+    // Validate request
+    if (!req.body.customerUuid) {
+        res.status(400).send({ message: "ID Not Found!" });
+        return;
+    }
+
+    //Find the user
+    User.find({ "uuid": req.body.customerUuid })
+        .then(data => {
+            if (!data) {
+                res.status(404).send({
+                    message: "Some error occurred, please try again later."
+                });
+            }
+            else {
+                console.log("Currently Available Booking Requests Data of User");
+                console.log(data[0].bookingRequests)
+
+                console.log("After Adding New Booking Requests");
+
+                newRefNo = new Date().getMilliseconds().toString() + Math.floor(Math.random() * 100).toString();
+                req.body.bookingRequest.reference_number = newRefNo;
+
+                data[0].bookingRequests.push(
+                    req.body.bookingRequest);
+
+                console.log(data[0].bookingRequests);
+
+                bookingRequests = data[0].bookingRequests;
+
+                update = { bookingRequests: data[0].bookingRequests };
+
+
+                //-----------------------------UPDATE DB-------------------------
+                if (update != null) {
+                    console.log("Inside update")
+                    User.findOneAndUpdate({ "uuid": req.body.customerUuid }, update)
+                        .then(data1 => {
+                            if (!data1) {
+                                res.status(404).send({
+                                    message: "Some error occurred, please try again later."
+                                });
+                            }
+                            else {
+                                console.log("Done update");
+                                console.log(update);
+                                console.log("sending reference No: " + newRefNo);
+                                res.send({ reference_number: newRefNo });
+                            }
+                        })
+                        .catch(err => {
+                            res.status(500).send({
+                                message: "Error updating."
+                            });
+                        });
+                }
+                //----------------------- TILL HERE------------------
+            }
+        })
+        .catch(err => {
+            res.status(500).send({
+                message: "Error validating token!."
+            });
+        });
+
+
+
+};
+
+module.exports = { login, signUp, logout, getCouponCode, bookShow };

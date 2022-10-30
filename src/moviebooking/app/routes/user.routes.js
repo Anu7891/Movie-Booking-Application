@@ -14,5 +14,11 @@ module.exports = (app) => {
     // Logout route
     router.post("/auth/logout", userController.logout);
 
+    // 4. Coupen route
+    router.get("/auth/coupons", userController.getCouponCode);
+
+    // 5. Book show for user
+    router.post("/auth/bookings", userController.bookShow);
+
     app.use("/api", router);
 }
